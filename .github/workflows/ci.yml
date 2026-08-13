@@ -1,4 +1,4 @@
-name: CI Proyecto Full Stack
+name: CI Proyecto Full Stack Movie
 
 on:
   push:
