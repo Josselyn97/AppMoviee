@@ -3,10 +3,9 @@ const { Pool } = require('pg');
 const cors = require('cors');
 
 const app = express();
-app.use(cors()); // Permite que el navegador web se conecte sin bloqueos de seguridad
+app.use(cors()); 
 app.use(express.json());
 
-// Configuración de conexión hacia tu contenedor de Docker
 const pool = new Pool({
   user: 'postgres',
   host: 'localhost',
@@ -24,7 +23,6 @@ app.post('/api/login', async (req, res) => {
       [email, password]
     );
     if (result.rows.length > 0) {
-      // ENVIAMOS EL PRIMER REGISTRO DE LA FILA (rows[0])
       res.status(200).json({ 
         success: true, 
         user: result.rows[0] 
@@ -37,7 +35,6 @@ app.post('/api/login', async (req, res) => {
     res.status(500).json({ error: 'Error de servidor' });
   }
 });
-
 
 // Endpoint para Registrarse
 app.post('/api/register', async (req, res) => {
@@ -58,7 +55,12 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-app.listen(3000, () => {
-  console.log('🚀 Servidor Backend intermedio corriendo en http://localhost:3000');
-});
+// Protege el arranque del puerto para que NO se ejecute en los tests
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(3000, () => {
+        console.log('🚀 Servidor Backend intermedio corriendo en http://localhost:3000');
+    });
+}
 
+// Exporta la aplicación al final del documento de forma limpia
+module.exports = app;

@@ -30,7 +30,7 @@ jobs:
         run: npm run lint --if-present
 
       - name: Ejecutar pruebas Backend
-        run: npm test --if-present
+        run: npm test
 
       - name: Construir Backend
         run: npm run build --if-present
