@@ -1,0 +1,30 @@
+name: ci-basico
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtenre código
+        uses: actions/checkout@v4
+
+      - name: Preprar  Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Calidad
+        run: npm run lint --if-present
+
+      - name: Ejecutar pruebas
+        run: npm test
+
+      - name: Contrucción
+        run: npm run build --if-present

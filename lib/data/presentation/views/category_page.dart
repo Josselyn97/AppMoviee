@@ -68,14 +68,9 @@ class CategoryPage extends StatelessWidget {
           index,
         ) {
           return UserCard(
-<<<<<<< HEAD
             userEntity: users[index],
           );
 
-=======
-            user: users[index],
-          );
->>>>>>> 8f6545b972ed325fc520b5e3561586153d1bb17a
         },
       ),
     );
