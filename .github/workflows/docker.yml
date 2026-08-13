@@ -1,0 +1,27 @@
+name: CI Docker Movie
+
+on:
+  push:
+    branches:
+      - main
+      - "feat/**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validar-docker:
+    name: Validar Docker
+    runs-on: ubuntu-latest
+    # NOTA: Al estar en archivos separados, este flujo se ejecutará al mismo tiempo que el backend.
+    # Si requieres que espere al backend, se gestiona manteniendo un solo archivo o mediante "workflow_run".
+
+    steps:
+      - name: Obtener código
+        uses: actions/checkout@v4
+
+      - name: Validar Docker Compose
+        run: docker compose config
+
+      - name: Construir imágenes Docker
+        run: docker compose build

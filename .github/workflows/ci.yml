@@ -1,4 +1,4 @@
-name: CI Proyecto Full Stack Movie
+name: CI Backend Movie
 
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '24' # Versión de Node compatible con tu proyecto
+          node-version: '24'
           cache: 'npm'
 
       - name: Instalar dependencias Backend
@@ -34,20 +34,3 @@ jobs:
 
       - name: Construir Backend
         run: npm run build --if-present
-
-  validar-docker:
-    name: Validar Docker
-    runs-on: ubuntu-latest
-    needs: validar-backend # Asegura que Docker solo valide si el backend pasa con éxito
-
-    steps:
-      - name: Obtener código
-        uses: actions/checkout@v4
-
-      - name: Validar Docker Compose
-        # Comprueba que la sintaxis de tu docker-compose.yml esté perfecta
-        run: docker compose config
-
-      - name: Construir imágenes Docker
-        # Compila tu Dockerfile aplicando el .dockerignore que creamos
-        run: docker compose build
