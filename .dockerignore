@@ -1,0 +1,26 @@
+# Dependencias locales (Docker las instalará limpiamente adentro)
+node_modules/
+npm-debug.log
+
+# Git e historial
+.git
+.gitignore
+
+# Archivos de entorno y credenciales privadas (¡NUNCA subirlos a la imagen!)
+.env
+.env.local
+
+# Pruebas y configuraciones de testing (No se necesitan para ejecutar el servidor)
+server.test.js
+.github/
+
+# Archivos del Frontend de Flutter (ya que están en la misma carpeta raíz)
+android/
+ios/
+lib/
+linux/
+macos/
+web/
+windows/
+pubspec.yaml
+pubspec.lock

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: api_list_backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=host.docker.internal  # Permite al contenedor Node.js hablar con el contenedor Postgres de tu PC
+      - DB_USER=postgres
+      - DB_PASSWORD=123456
+      - DB_NAME=movie_app
+      - DB_PORT=5433 # El puerto externo que nos muestra tu Docker Desktop
