@@ -10,7 +10,6 @@ pipeline {
     }
 
     environment {
-        // Carpeta portátil dentro del proyecto para las herramientas Docker
         DOCKER_BIN_DIR = "${WORKSPACE}/docker_bin"
         PATH           = "${DOCKER_BIN_DIR}:${env.PATH}"
     }
@@ -25,24 +24,25 @@ pipeline {
         stage('Setup Docker Tools') {
             steps {
                 sh '''
-                    if [ ! -f "$DOCKER_BIN_DIR/docker" ]; then
-                        echo "Instalando herramientas de Docker internamente en Jenkins..."
-                        mkdir -p $DOCKER_BIN_DIR
-                        
-                        # ENLACE CORREGIDO: Descarga directa del binario estático de Docker
-                        curl -fsSL https://docker.com -o docker.tgz
-                        tar -xzf docker.tgz --strip-components=1 -C $DOCKER_BIN_DIR
-                        rm docker.tgz
-                        
-                        # Descarga del ejecutable de Docker Compose (v2)
-                        curl -fsSL https://github.com -o $DOCKER_BIN_DIR/docker-compose
-                        chmod +x $DOCKER_BIN_DIR/docker-compose
-                        
-                        # Enlace simbólico interno para soportar el comando 'docker compose' (con espacio)
-                        ln -s docker-compose $DOCKER_BIN_DIR/docker-compose-plugin 2>/dev/null || true
-                    fi
+                    # Forzar la limpieza de archivos corruptos anteriores si existen
+                    rm -f docker.tgz
+                    rm -rf $DOCKER_BIN_DIR
                     
-                    # Comprobación de versiones en la consola
+                    echo "Instalando herramientas de Docker de forma limpia..."
+                    mkdir -p $DOCKER_BIN_DIR
+                    
+                    # DESCARGA DEFINITIVA DEL BINARIO REAL
+                    curl -fsSL https://docker.com -o docker.tgz
+                    tar -xzf docker.tgz --strip-components=1 -C $DOCKER_BIN_DIR
+                    rm -f docker.tgz
+                    
+                    # Descarga de Docker Compose v2
+                    curl -fsSL https://github.com -o $DOCKER_BIN_DIR/docker-compose
+                    chmod +x $DOCKER_BIN_DIR/docker-compose
+                    
+                    # Enlace para comando docker compose con espacio
+                    ln -s docker-compose $DOCKER_BIN_DIR/docker-compose-plugin 2>/dev/null || true
+                    
                     docker --version
                     docker-compose version
                 '''
@@ -82,7 +82,7 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline satisfactorio - ¡Tu backend pasó los tests y la imagen Docker fue creada exitosamente!'
+            echo 'Pipeline satisfactorio - ¡Imágenes creadas exitosamente!'
         }
         failure {
             echo 'Revisar la primera etapa fallida y sus logs'
