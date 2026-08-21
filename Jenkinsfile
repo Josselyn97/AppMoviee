@@ -9,11 +9,6 @@ pipeline {
         timestamps()
     }
 
-    environment {
-        DOCKER_BIN_DIR = "${WORKSPACE}/docker_bin"
-        PATH           = "${DOCKER_BIN_DIR}:${env.PATH}"
-    }
-
     stages {
         stage('Checkout') {
             steps {
@@ -23,28 +18,22 @@ pipeline {
 
         stage('Setup Docker Tools') {
             steps {
+                // Instalación limpia y nativa mediante el gestor de paquetes de Linux
                 sh '''
-                    # Forzar la limpieza de archivos corruptos anteriores si existen
-                    rm -f docker.tgz
-                    rm -rf $DOCKER_BIN_DIR
+                    echo "Instalando herramientas oficiales de Docker nativamente..."
                     
-                    echo "Instalando herramientas de Docker de forma limpia..."
-                    mkdir -p $DOCKER_BIN_DIR
-                    
-                    # DESCARGA DEFINITIVA DEL BINARIO REAL
-                    curl -fsSL https://docker.com -o docker.tgz
-                    tar -xzf docker.tgz --strip-components=1 -C $DOCKER_BIN_DIR
-                    rm -f docker.tgz
-                    
-                    # Descarga de Docker Compose v2
-                    curl -fsSL https://github.com -o $DOCKER_BIN_DIR/docker-compose
-                    chmod +x $DOCKER_BIN_DIR/docker-compose
-                    
-                    # Enlace para comando docker compose con espacio
-                    ln -s docker-compose $DOCKER_BIN_DIR/docker-compose-plugin 2>/dev/null || true
-                    
+                    # Detectar el gestor de paquetes e instalar Docker y Docker Compose
+                    if command -v apk >/dev/null 2>&1; then
+                        apk update && apk add --no-cache docker-cli docker-compose
+                    elif command -v apt-get >/dev/null 2>&1; then
+                        apt-get update && apt-get install -y docker.io docker-compose
+                    else
+                        echo "No se pudo determinar el instalador del sistema."
+                    fi
+
+                    # Verificar reconocimiento inmediato
                     docker --version
-                    docker-compose version
+                    docker-compose version || docker compose version
                 '''
             }
         }
@@ -69,20 +58,22 @@ pipeline {
 
         stage('Docker - Validate') {
             steps {
-                sh 'docker-compose config'
+                // Intenta validar usando la sintaxis disponible en el sistema
+                sh 'docker compose config || docker-compose config'
             }
         }
 
         stage('Docker - Build') {
             steps {
-                sh 'docker-compose build'
+                // Compila la imagen de tu Backend
+                sh 'docker compose build || docker-compose build'
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline satisfactorio - ¡Imágenes creadas exitosamente!'
+            echo 'Pipeline satisfactorio - ¡Tu backend pasó los tests y la imagen Docker fue creada exitosamente!'
         }
         failure {
             echo 'Revisar la primera etapa fallida y sus logs'
