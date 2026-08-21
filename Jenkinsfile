@@ -10,6 +10,12 @@ pipeline {
         disableConcurrentBuilds()
     }
 
+    environment {
+        // Definimos una ruta local dentro del espacio de trabajo para instalar Flutter de forma portátil
+        FLUTTER_HOME = "${WORKSPACE}/flutter_sdk"
+        PATH         = "${FLUTTER_HOME}/bin:${env.PATH}"
+    }
+
     stages {
         stage('Checkout') {
             steps {
@@ -20,49 +26,41 @@ pipeline {
         stage('Build & Test') {
             parallel {
 
-                // PIPELINE DEL BACKEND (Usa el agente base de Jenkins)
+                // PIPELINE DEL BACKEND
                 stage('Backend Pipeline') {
                     steps {
-                        // Agrupamos en un solo bloque script para mayor orden
                         sh 'npm ci'
                         sh 'npx prisma generate'
                         sh 'npm test'
                     }
                 }
 
-                // PIPELINE DEL FRONTEND (Usa un contenedor temporal con Flutter)
+                // PIPELINE DEL FRONTEND (Descarga e instalación automática y limpia)
                 stage('Frontend Pipeline') {
-                    agent {
-                        docker {
-                            // Imagen oficial ligera de Flutter (puedes cambiar la versión si lo requieres)
-                            image 'ghcr.io/cirruslabs/flutter:3.24.0'
-                            // Reutiliza el directorio de Jenkins dentro del contenedor
-                            reuseNode true 
-                        }
-                    }
-                    stages {
-                        stage('Frontend - Install') {
-                            steps {
-                                sh 'flutter pub get'
-                            }
-                        }
-                        stage('Frontend - Analyze') {
-                            steps {
-                                sh 'flutter analyze'
-                            }
-                        }
-                        stage('Frontend - Test') {
-                            steps {
-                                sh 'flutter test'
-                            }
-                        }
+                    steps {
+                        // Detecta si Flutter ya está descargado en el espacio de trabajo, si no, lo descarga.
+                        sh '''
+                            if [ ! -d "$FLUTTER_HOME" ]; then
+                                echo "Instalando Flutter SDK de forma portátil..."
+                                git clone https://github.com -b stable --depth 1 $FLUTTER_HOME
+                            fi
+                        '''
+                        
+                        // Forzar pre-descarga de binarios necesarios y deshabilitar analíticas molestas en Jenkins
+                        sh 'flutter config --no-analytics'
+                        sh 'flutter doctor --version'
+
+                        // Ejecución de pruebas y validaciones del Frontend
+                        sh 'flutter pub get'
+                        sh 'flutter analyze'
+                        sh 'flutter test'
                     }
                 }
 
             }
         }
 
-        // ETAPA DE CONTENEDORES
+        // ETAPA DE CONTENEDORES (Docker)
         stage('Docker Services') {
             stages {
                 stage('Docker - Validate') {
