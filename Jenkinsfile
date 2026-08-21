@@ -2,64 +2,97 @@ pipeline {
     agent any
 
     tools {
+        // Herramienta para el Backend (Asegúrate de tener este nombre en tu configuración global de Jenkins)
         nodejs 'NodeJS-24'
     }
 
     options {
         timestamps()
+        disableConcurrentBuilds()
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        // 1. Instala las dependencias en la raíz
-        stage('App - Install') {
-            steps {
-                sh 'npm ci'
+        stage('Build & Test') {
+            parallel {
+
+                // PIPELINE DEL BACKEND (Ejecutado en la raíz del proyecto)
+                stage('Backend Pipeline') {
+                    stages {
+                        stage('Backend - Install') {
+                            steps {
+                                // Corre directamente en la raíz porque ahí está tu package.json
+                                sh 'npm ci'
+                            }
+                        }
+                        stage('Backend - Prisma') {
+                            steps {
+                                sh 'npx prisma generate'
+                            }
+                        }
+                        stage('Backend - Test') {
+                            steps {
+                                sh 'npm test'
+                            }
+                        }
+                    }
+                }
+
+                // PIPELINE DEL FRONTEND (Flutter)
+                stage('Frontend Pipeline') {
+                    stages {
+                        stage('Frontend - Install') {
+                            steps {
+                                // Descarga las dependencias de Flutter
+                                sh 'flutter pub get'
+                            }
+                        }
+                        stage('Frontend - Analyze') {
+                            steps {
+                                // Reemplaza al 'npm run lint' para verificar la calidad del código Dart
+                                sh 'flutter analyze'
+                            }
+                        }
+                        stage('Frontend - Test') {
+                            steps {
+                                // Ejecuta los tests del frontend en Flutter
+                                sh 'flutter test'
+                            }
+                        }
+                    }
+                }
+
             }
         }
 
-        // 2. Genera Prisma en la raíz
-        stage('App - Prisma') {
-            steps {
-                sh 'npx prisma generate'
-            }
-        }
-
-        // 3. Ejecuta server.test.js en la raíz
-        stage('App - Test') {
-            steps {
-                sh 'npm test'
-            }
-        }
-
-        // 4. Valida tu archivo de Docker Compose
-        stage('Docker - Validate') {
-            steps {
-                sh 'docker compose config'
-            }
-        }
-
-        // 5. Construye el contenedor del proyecto monolítico
-        stage('Docker - Build') {
-            steps {
-                sh 'docker compose build'
+        // ETAPA DE CONTENEDORES (Docker)
+        stage('Docker Services') {
+            stages {
+                stage('Docker - Validate') {
+                    steps {
+                        sh 'docker compose config'
+                    }
+                }
+                stage('Docker - Build') {
+                    steps {
+                        sh 'docker compose build'
+                    }
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline satisfactorio'
+            echo '¡Pipeline completado con éxito para AppMoviee!'
         }
-
         failure {
-            echo 'Revisar la primera etapa fallida y sus logs'
+            echo 'El pipeline ha fallado. Por favor, revisa los logs de la etapa afectada.'
         }
     }
 }
