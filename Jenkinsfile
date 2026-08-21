@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     tools {
-        // Herramienta para el Backend (Asegúrate de tener este nombre en tu configuración global de Jenkins)
         nodejs 'NodeJS-24'
     }
 
@@ -21,46 +20,39 @@ pipeline {
         stage('Build & Test') {
             parallel {
 
-                // PIPELINE DEL BACKEND (Ejecutado en la raíz del proyecto)
+                // PIPELINE DEL BACKEND (Usa el agente base de Jenkins)
                 stage('Backend Pipeline') {
-                    stages {
-                        stage('Backend - Install') {
-                            steps {
-                                // Corre directamente en la raíz porque ahí está tu package.json
-                                sh 'npm ci'
-                            }
-                        }
-                        stage('Backend - Prisma') {
-                            steps {
-                                sh 'npx prisma generate'
-                            }
-                        }
-                        stage('Backend - Test') {
-                            steps {
-                                sh 'npm test'
-                            }
-                        }
+                    steps {
+                        // Agrupamos en un solo bloque script para mayor orden
+                        sh 'npm ci'
+                        sh 'npx prisma generate'
+                        sh 'npm test'
                     }
                 }
 
-                // PIPELINE DEL FRONTEND (Flutter)
+                // PIPELINE DEL FRONTEND (Usa un contenedor temporal con Flutter)
                 stage('Frontend Pipeline') {
+                    agent {
+                        docker {
+                            // Imagen oficial ligera de Flutter (puedes cambiar la versión si lo requieres)
+                            image 'ghcr.io/cirruslabs/flutter:3.24.0'
+                            // Reutiliza el directorio de Jenkins dentro del contenedor
+                            reuseNode true 
+                        }
+                    }
                     stages {
                         stage('Frontend - Install') {
                             steps {
-                                // Descarga las dependencias de Flutter
                                 sh 'flutter pub get'
                             }
                         }
                         stage('Frontend - Analyze') {
                             steps {
-                                // Reemplaza al 'npm run lint' para verificar la calidad del código Dart
                                 sh 'flutter analyze'
                             }
                         }
                         stage('Frontend - Test') {
                             steps {
-                                // Ejecuta los tests del frontend en Flutter
                                 sh 'flutter test'
                             }
                         }
@@ -70,7 +62,7 @@ pipeline {
             }
         }
 
-        // ETAPA DE CONTENEDORES (Docker)
+        // ETAPA DE CONTENEDORES
         stage('Docker Services') {
             stages {
                 stage('Docker - Validate') {
