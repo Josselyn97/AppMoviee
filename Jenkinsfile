@@ -11,7 +11,7 @@ pipeline {
     }
 
     environment {
-        // Ajustado solo para tu Backend (Eliminado el Frontend)
+        // Tus variables modificadas se mantienen intactas
         LOCAL_BACKEND_IMAGE  = 'api_list_app-backend'
         REMOTE_BACKEND_IMAGE = 'api_list_app-backend'
     }
@@ -23,7 +23,6 @@ pipeline {
             }
         }
 
-        // ETAPA CLAVE: Asegura que los comandos de Docker estén disponibles nativamente
         stage('Setup Docker Tools') {
             steps {
                 sh '''
@@ -41,7 +40,6 @@ pipeline {
             }
         }
 
-        // --- ETAPAS DEL BACKEND (Raíz del proyecto) ---
         stage('Backend - Install') {
             steps {
                 sh 'npm ci'
@@ -60,7 +58,6 @@ pipeline {
             }
         }
 
-        // --- ETAPAS DE DOCKER ---
         stage('Docker - Validate') {
             steps {
                 sh 'docker compose config --quiet || docker-compose config --quiet'
@@ -75,7 +72,6 @@ pipeline {
 
         stage('Docker - Verify Images') {
             steps {
-                // Solo verifica la imagen del backend que realmente existe
                 sh 'docker image inspect ${LOCAL_BACKEND_IMAGE} > /dev/null'
             }
         }
@@ -83,23 +79,26 @@ pipeline {
         stage('Docker - Publish') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'DevOps-Practica', // Asegúrate de tener este ID creado en Jenkins Credentials
+                    // Tu nueva credencial configurada se mantiene intacta
+                    credentialsId: 'DevOps-Practica', 
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    // SOLUCIÓN: Reintenta automáticamente hasta 3 veces si la red falla (EOF)
+                    retry(3) {
+                        sh '''
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                        # Taggear y subir únicamente la imagen del backend
-                        docker tag \
-                            ${LOCAL_BACKEND_IMAGE}:latest \
-                            $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
+                            docker tag \
+                                ${LOCAL_BACKEND_IMAGE}:latest \
+                                $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
 
-                        docker push \
-                            $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
+                            echo "Iniciando subida a Docker Hub..."
+                            docker push $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
 
-                        docker logout
-                    '''
+                            docker logout
+                        '''
+                    }
                 }
             }
         }
