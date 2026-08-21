@@ -83,7 +83,7 @@ pipeline {
         stage('Docker - Publish') {
             steps {
                 withCredentials([usernamePassword(
-                    credentialsId: 'DevOps-Practica-3', // Asegúrate de tener este ID creado en Jenkins Credentials
+                    credentialsId: 'DevOps-Practica', // Asegúrate de tener este ID creado en Jenkins Credentials
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
