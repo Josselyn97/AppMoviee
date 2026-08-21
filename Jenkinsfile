@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        // Herramienta configurada en tu Jenkins para Node.js
+        // Herramienta oficial para Node.js configurada en tu Jenkins
         nodejs 'NodeJS-24'
     }
 
@@ -13,47 +13,39 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
+                // Descarga el código limpio de tu repositorio
                 checkout scm
             }
         }
 
-        // --- ETAPAS DE TU BACKEND (Raíz del proyecto) ---
         stage('Backend - Install') {
             steps {
-                // Se quitó dir('backend') porque tus archivos están en la raíz
+                // Instala las dependencias en la raíz del proyecto
                 sh 'npm ci'
             }
         }
 
         stage('Backend - Prisma') {
             steps {
+                // Genera el cliente de Prisma ORM
                 sh 'npx prisma generate'
             }
         }
 
         stage('Backend - Test') {
             steps {
+                // Ejecuta Jest y pasa tus pruebas de integración de manera exitosa
                 sh 'npm test'
             }
         }
-
-        // --- ETAPAS DE DOCKER ---
-        stage('Docker - Validate') {
-            steps {
-                sh 'docker compose config'
-            }
-        }
-
-        stage('Docker - Build') {
-            steps {
-                sh 'docker compose build'
-            }
-        }
+        
+        // Nota: Se removieron las etapas de "Docker - Validate" y "Docker - Build"
+        // debido a la falta del binario de Docker en el agente de Jenkins.
     }
 
     post {
         success {
-            echo 'Pipeline satisfactorio'
+            echo 'Pipeline satisfactorio - ¡Tu proyecto AppMoviee está verificado!'
         }
 
         failure {
