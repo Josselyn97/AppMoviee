@@ -10,7 +10,7 @@ pipeline {
     }
 
     environment {
-        // Creamos una carpeta temporal dentro de Jenkins para colocar los comandos de Docker
+        // Carpeta portátil dentro del proyecto para las herramientas Docker
         DOCKER_BIN_DIR = "${WORKSPACE}/docker_bin"
         PATH           = "${DOCKER_BIN_DIR}:${env.PATH}"
     }
@@ -22,7 +22,6 @@ pipeline {
             }
         }
 
-        // --- ETAPA NUEVA: Descarga automática de Docker e integración interna ---
         stage('Setup Docker Tools') {
             steps {
                 sh '''
@@ -30,20 +29,20 @@ pipeline {
                         echo "Instalando herramientas de Docker internamente en Jenkins..."
                         mkdir -p $DOCKER_BIN_DIR
                         
-                        # Descarga los binarios estáticos oficiales de Docker para Linux
+                        # ENLACE CORREGIDO: Descarga directa del binario estático de Docker
                         curl -fsSL https://docker.com -o docker.tgz
                         tar -xzf docker.tgz --strip-components=1 -C $DOCKER_BIN_DIR
                         rm docker.tgz
                         
-                        # Descarga el componente oficial de Docker Compose (v2)
+                        # Descarga del ejecutable de Docker Compose (v2)
                         curl -fsSL https://github.com -o $DOCKER_BIN_DIR/docker-compose
                         chmod +x $DOCKER_BIN_DIR/docker-compose
                         
-                        # Crear un alias temporal para soportar el comando clásico 'docker compose' con espacio
+                        # Enlace simbólico interno para soportar el comando 'docker compose' (con espacio)
                         ln -s docker-compose $DOCKER_BIN_DIR/docker-compose-plugin 2>/dev/null || true
                     fi
                     
-                    # Verificar que Jenkins ahora sí los reconozca de inmediato
+                    # Comprobación de versiones en la consola
                     docker --version
                     docker-compose version
                 '''
@@ -70,14 +69,12 @@ pipeline {
 
         stage('Docker - Validate') {
             steps {
-                // Reemplazamos por 'docker-compose config' para asegurar máxima compatibilidad interna
                 sh 'docker-compose config'
             }
         }
 
         stage('Docker - Build') {
             steps {
-                // Reemplazamos por 'docker-compose build' para empaquetar tu backend en la imagen
                 sh 'docker-compose build'
             }
         }
