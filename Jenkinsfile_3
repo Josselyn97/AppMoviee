@@ -11,12 +11,9 @@ pipeline {
     }
 
     environment {
+        // Tus variables modificadas se mantienen intactas
         LOCAL_BACKEND_IMAGE  = 'api_list_app-backend'
         REMOTE_BACKEND_IMAGE = 'api_list_app-backend'
-        
-        // --- SOLUCIÓN CRÍTICA DE RED: Forzar límites tolerantes a conexiones lentas ---
-        DOCKER_CLIENT_TIMEOUT = '300'
-        COMPOSE_HTTP_TIMEOUT  = '300'
     }
 
     stages {
@@ -82,33 +79,25 @@ pipeline {
         stage('Docker - Publish') {
             steps {
                 withCredentials([usernamePassword(
+                    // Tu nueva credencial configurada se mantiene intacta
                     credentialsId: 'DevOps-Practica', 
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-                    // Intenta subir la imagen hasta 3 veces si la red genera cortes bruscos
+                    // SOLUCIÓN: Reintenta automáticamente hasta 3 veces si la red falla (EOF)
                     retry(3) {
-                        script {
-                            try {
-                                sh '''
-                                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        sh '''
+                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                                    docker tag \
-                                        ${LOCAL_BACKEND_IMAGE}:latest \
-                                        $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
+                            docker tag \
+                                ${LOCAL_BACKEND_IMAGE}:latest \
+                                $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
 
-                                    echo "Iniciando subida tolerante a Docker Hub..."
-                                    docker push $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
+                            echo "Iniciando subida a Docker Hub..."
+                            docker push $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
 
-                                    docker logout
-                                '''
-                            } catch (Exception e) {
-                                echo "Fallo de conexión detectado (EOF/Handshake). Esperando 15 segundos para estabilizar la red antes de reintentar..."
-                                // Pausa obligatoria para limpiar el canal de red antes de volver a intentar
-                                sleep 15
-                                throw e
-                            }
-                        }
+                            docker logout
+                        '''
                     }
                 }
             }
