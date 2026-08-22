@@ -7,22 +7,40 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : false,
-});
+// ========================================
+// CONEXIÓN A POSTGRESQL
+// ========================================
 
-// Ruta de prueba
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: false }
+        : false,
+    })
+  : new Pool({
+      user: process.env.DB_USER || 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      database: process.env.DB_NAME || 'movie_app',
+      password: process.env.DB_PASSWORD || '123456',
+      port: Number(process.env.DB_PORT || 5433),
+    });
+
+// ========================================
+// RUTA DE PRUEBA
+// ========================================
+
 app.get('/', (req, res) => {
-  res.json({
-    message: 'API Moviee funcionando correctamente',
-    status: 'OK'
+  res.status(200).json({
+    success: true,
+    message: 'API List App Backend funcionando correctamente',
   });
 });
 
-// Endpoint para iniciar sesión
+// ========================================
+// LOGIN
+// ========================================
+
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -33,25 +51,29 @@ app.post('/api/login', async (req, res) => {
     );
 
     if (result.rows.length > 0) {
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
-        user: result.rows[0]
-      });
-    } else {
-      res.status(401).json({
-        error: 'Credenciales incorrectas'
+        user: result.rows[0],
       });
     }
 
+    return res.status(401).json({
+      error: 'Credenciales incorrectas',
+    });
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: 'Error de servidor'
+    console.error('Error en login:', err);
+
+    return res.status(500).json({
+      error: 'Error de servidor',
     });
   }
 });
 
-// Endpoint para registrarse
+// ========================================
+// REGISTRO
+// ========================================
+
 app.post('/api/register', async (req, res) => {
   const { name, email, password } = req.body;
 
@@ -63,7 +85,7 @@ app.post('/api/register', async (req, res) => {
 
     if (userCheck.rows.length > 0) {
       return res.status(400).json({
-        error: 'El correo ya existe'
+        error: 'El correo ya existe',
       });
     }
 
@@ -72,24 +94,27 @@ app.post('/api/register', async (req, res) => {
       [name, email, password]
     );
 
-    res.status(201).json({
-      success: true
+    return res.status(201).json({
+      success: true,
     });
 
   } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: 'Error de servidor'
+    console.error('Error en registro:', err);
+
+    return res.status(500).json({
+      error: 'Error de servidor',
     });
   }
 });
 
-if (process.env.NODE_ENV !== 'test') {
-  const PORT = process.env.PORT || 3000;
+// ========================================
+// PUERTO PARA RAILWAY
+// ========================================
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor corriendo en el puerto ${PORT}`);
-  });
-}
+const PORT = Number(process.env.PORT || 3000);
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Backend ejecutándose en puerto ${PORT}`);
+});
 
 module.exports = app;

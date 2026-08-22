@@ -22,7 +22,7 @@ class UserViewModel extends ChangeNotifier {
 
   bool authLoading = false;
 
-  final String _apiUrl = 'http://localhost:3000/api';
+  final String _apiUrl = 'https://apilistapp-backend-appmovie.up.railway.app/api';
 
   Map<String, dynamic>? _currentUser;
   Map<String, dynamic>? get currentUser => _currentUser;
