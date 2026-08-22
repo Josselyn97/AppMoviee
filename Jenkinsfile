@@ -1,4 +1,5 @@
 pipeline {
+
     agent any
 
     tools {
@@ -8,108 +9,204 @@ pipeline {
     options {
         timestamps()
         skipDefaultCheckout(true)
+        disableConcurrentBuilds()
     }
 
     environment {
-        LOCAL_BACKEND_IMAGE  = 'api_list_app-backend'
-        REMOTE_BACKEND_IMAGE = 'api_list_app-backend'
-        
-        // --- SOLUCIÓN CRÍTICA DE RED: Forzar límites tolerantes a conexiones lentas ---
-        DOCKER_CLIENT_TIMEOUT = '300'
-        COMPOSE_HTTP_TIMEOUT  = '300'
+        LOCAL_BACKEND_IMAGE  = 'proyecto-integrador-u3-backend'
+        LOCAL_FRONTEND_IMAGE = 'proyecto-integrador-u3-frontend'
+
+        REMOTE_BACKEND_IMAGE  = 'proyecto-integrador-backend'
+        REMOTE_FRONTEND_IMAGE = 'proyecto-integrador-frontend'
+
+        RAILWAY_PROJECT_ID = '6c759af0-9895-4a99-8b00-bf4642281129'
+        RAILWAY_ENVIRONMENT_ID = 'efdd7c0a-1fa7-4d3a-89d0-f7647e948c4c'
+        RAILWAY_BACKEND_SERVICE_ID = '5c52cc15-b575-488a-969e-c35bacee17c0'
+        RAILWAY_FRONTEND_SERVICE_ID = '4c049b51-26d5-4b82-bf0b-2534c80c888c'
     }
 
     stages {
+
         stage('Checkout') {
             steps {
                 checkout scm
             }
         }
 
-        stage('Setup Docker Tools') {
-            steps {
-                sh '''
-                    echo "Instalando herramientas oficiales de Docker nativamente..."
-                    if command -v apk >/dev/null 2>&1; then
-                        apk update && apk add --no-cache docker-cli docker-compose
-                    elif command -v apt-get >/dev/null 2>&1; then
-                        apt-get update && apt-get install -y docker.io docker-compose
-                    else
-                        echo "No se pudo determinar el instalador del sistema."
-                    fi
-                    docker --version
-                    docker-compose version || docker compose version
-                '''
-            }
-        }
-
         stage('Backend - Install') {
             steps {
-                sh 'npm ci'
+                dir('backend') {
+                    sh 'npm ci'
+                }
             }
         }
 
         stage('Backend - Prisma') {
             steps {
-                sh 'npx prisma generate'
+                dir('backend') {
+                    sh 'npx prisma generate'
+                }
             }
         }
 
         stage('Backend - Test') {
             steps {
-                sh 'npm test'
+                dir('backend') {
+                    sh 'npm test'
+                }
+            }
+        }
+
+        stage('Frontend - Install') {
+            steps {
+                dir('frontend') {
+                    sh 'npm ci'
+                }
+            }
+        }
+
+        stage('Frontend - Lint') {
+            steps {
+                dir('frontend') {
+                    sh 'npm run lint'
+                }
+            }
+        }
+
+        stage('Frontend - Build') {
+            steps {
+                dir('frontend') {
+                    sh 'npm run build'
+                }
             }
         }
 
         stage('Docker - Validate') {
             steps {
-                sh 'docker compose config --quiet || docker-compose config --quiet'
+                sh 'docker compose config --quiet'
             }
         }
 
         stage('Docker - Build') {
             steps {
-                sh 'docker compose build || docker-compose build'
+                sh 'docker compose build --no-cache'
             }
         }
 
         stage('Docker - Verify Images') {
             steps {
-                sh 'docker image inspect ${LOCAL_BACKEND_IMAGE} > /dev/null'
+                sh '''
+                    set -eu
+
+                    echo "Verificando imágenes construidas..."
+
+                    docker image inspect "${LOCAL_BACKEND_IMAGE}:latest" > /dev/null
+                    docker image inspect "${LOCAL_FRONTEND_IMAGE}:latest" > /dev/null
+
+                    echo "Imágenes verificadas correctamente."
+                '''
             }
         }
 
         stage('Docker - Publish') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'DevOps-Practica', 
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    // Intenta subir la imagen hasta 3 veces si la red genera cortes bruscos
-                    retry(3) {
-                        script {
-                            try {
-                                sh '''
-                                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'jenkins-u3',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
 
-                                    docker tag \
-                                        ${LOCAL_BACKEND_IMAGE}:latest \
-                                        $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
+                        echo "========================================"
+                        echo "PUBLICACIÓN EN DOCKER HUB"
+                        echo "========================================"
 
-                                    echo "Iniciando subida tolerante a Docker Hub..."
-                                    docker push $DOCKER_USER/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}
+                        export DOCKER_CONFIG="$(mktemp -d)"
+                        trap 'rm -rf "$DOCKER_CONFIG"' EXIT
 
-                                    docker logout
-                                '''
-                            } catch (Exception e) {
-                                echo "Fallo de conexión detectado (EOF/Handshake). Esperando 15 segundos para estabilizar la red antes de reintentar..."
-                                // Pausa obligatoria para limpiar el canal de red antes de volver a intentar
-                                sleep 15
-                                throw e
-                            }
-                        }
-                    }
+                        echo "$DOCKER_PASS" | docker login                             -u "$DOCKER_USER"                             --password-stdin
+
+                        BACKEND_LATEST="${DOCKER_USER}/${REMOTE_BACKEND_IMAGE}:latest"
+                        BACKEND_BUILD="${DOCKER_USER}/${REMOTE_BACKEND_IMAGE}:${BUILD_NUMBER}"
+
+                        FRONTEND_LATEST="${DOCKER_USER}/${REMOTE_FRONTEND_IMAGE}:latest"
+                        FRONTEND_BUILD="${DOCKER_USER}/${REMOTE_FRONTEND_IMAGE}:${BUILD_NUMBER}"
+
+                        docker tag "${LOCAL_BACKEND_IMAGE}:latest" "$BACKEND_LATEST"
+                        docker tag "${LOCAL_BACKEND_IMAGE}:latest" "$BACKEND_BUILD"
+
+                        docker tag "${LOCAL_FRONTEND_IMAGE}:latest" "$FRONTEND_LATEST"
+                        docker tag "${LOCAL_FRONTEND_IMAGE}:latest" "$FRONTEND_BUILD"
+
+                        docker push "$BACKEND_LATEST"
+                        docker push "$BACKEND_BUILD"
+
+                        docker push "$FRONTEND_LATEST"
+                        docker push "$FRONTEND_BUILD"
+
+                        docker logout
+
+                        echo "Imágenes publicadas correctamente en Docker Hub."
+                    '''
+                }
+            }
+        }
+
+        stage('Railway - CLI Check') {
+            steps {
+                sh '''
+                    set -eu
+                    echo "Verificando Railway CLI..."
+                    npx -y @railway/cli --version
+                '''
+            }
+        }
+
+        stage('Railway - Redeploy Backend') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'railway-token',
+                        variable: 'RAILWAY_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
+
+                        echo "========================================"
+                        echo "REDEPLOY BACKEND EN RAILWAY"
+                        echo "========================================"
+
+                        npx -y @railway/cli redeploy                             --service "$RAILWAY_BACKEND_SERVICE_ID"                             --environment "$RAILWAY_ENVIRONMENT_ID"                             --yes
+
+                        echo "Redeploy del backend solicitado correctamente."
+                    '''
+                }
+            }
+        }
+
+        stage('Railway - Redeploy Frontend') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'railway-token',
+                        variable: 'RAILWAY_TOKEN'
+                    )
+                ]) {
+                    sh '''
+                        set -eu
+
+                        echo "========================================"
+                        echo "REDEPLOY FRONTEND EN RAILWAY"
+                        echo "========================================"
+
+                        npx -y @railway/cli redeploy                             --service "$RAILWAY_FRONTEND_SERVICE_ID"                             --environment "$RAILWAY_ENVIRONMENT_ID"                             --yes
+
+                        echo "Redeploy del frontend solicitado correctamente."
+                    '''
                 }
             }
         }
@@ -117,16 +214,26 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline satisfactorio'
-            echo 'Imagen de Backend publicada correctamente en Docker Hub'
+            echo '========================================'
+            echo 'PIPELINE SATISFACTORIO'
+            echo '========================================'
+            echo 'Backend probado correctamente'
+            echo 'Frontend validado y construido'
+            echo 'Imágenes Docker construidas'
+            echo 'Imágenes publicadas en Docker Hub'
+            echo 'Redeploy solicitado para Backend en Railway'
+            echo 'Redeploy solicitado para Frontend en Railway'
         }
 
         failure {
-            echo 'Revisar la primera etapa fallida y sus logs'
+            echo '========================================'
+            echo 'PIPELINE FALLIDO'
+            echo '========================================'
+            echo 'Revisar la primera etapa fallida y su Console Output.'
         }
 
         always {
-            sh 'docker logout || true'
+            sh 'docker logout >/dev/null 2>&1 || true'
         }
     }
 }
